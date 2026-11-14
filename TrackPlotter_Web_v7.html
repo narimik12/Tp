@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TrackPlotter Web — пиксельное смешивание</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Arial;color:#172033;background:#edf1f7}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1200px;margin:auto;padding:20px}.head{display:flex;gap:14px;align-items:center;margin:4px 0 18px}.logo{background:#172b4d;color:#fff;border-radius:17px;padding:15px 18px;font-weight:850;font-size:25px}.head h1{font-size:clamp(22px,4vw,30px);margin:0}.head p{margin:3px 0 0;color:#64748b}.layout{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:16px}.panel{background:#fff;border:1px solid #dbe2eb;border-radius:18px;padding:17px;box-shadow:0 5px 22px #172b4d0a}.preview{min-height:360px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:13px;overflow:hidden}.preview canvas{max-width:100%;max-height:680px;object-fit:contain;image-rendering:pixelated}.buttons{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}button,.filebtn{border:0;border-radius:11px;padding:11px 15px;background:#2454d7;color:#fff;font-weight:700;cursor:pointer;font:inherit}button.secondary,.filebtn.secondary{background:#e8eef8;color:#24344e}button:disabled{opacity:.45;cursor:not-allowed}input[type=file]{display:none}label{display:block;font-size:13px;font-weight:700;color:#334155;margin:12px 0 5px}input[type=number]{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{display:flex;align-items:center;gap:8px;background:#f5f7fb;padding:9px;border-radius:10px;font-size:14px}.dot{width:15px;height:15px;border-radius:50%;display:inline-block;border:1px solid #0002}.hint{font-size:12px;color:#64748b;line-height:1.5}.status{margin-top:11px;font-size:13px;color:#475569;line-height:1.5}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stats div{background:#f1f5f9;padding:11px;border-radius:11px;text-align:center}.stats b{display:block;font-size:20px}.stats span{font-size:11px;color:#64748b}.note{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;padding:11px;border-radius:11px;font-size:12px;line-height:1.5;margin-top:12px}.warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:11px;border-radius:11px;font-size:12px;line-height:1.5;margin-top:10px}.footer{font-size:12px;color:#64748b;margin:16px 2px}.toggle{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:#334155}.toggle label{margin:0}.section{font-size:15px;margin:16px 0 5px}@media(max-width:850px){.wrap{padding:12px}.layout{grid-template-columns:1fr}.preview{min-height:270px}.panel{padding:13px}}
+</style>
+</head>
+<body><div class="wrap">
+<header class="head"><div class="logo">TP</div><div><h1>TrackPlotter Web</h1><p>4 маркера · смешивание частотой пикселей · один слой Б</p></div></header>
+<div class="layout"><main class="panel">
+<div class="preview" id="preview"><div style="color:#94a3b8;text-align:center;padding:22px">Загрузи фотографию, чтобы построить пиксельную мозаику</div></div>
+<div class="buttons"><label class="filebtn" for="file" style="margin:0">Открыть изображение</label><input id="file" type="file" accept="image/*"><button id="export" disabled>Скачать .TRK</button><button id="exportCsv" class="secondary" disabled>Скачать CSV</button></div>
+<div class="stats"><div><b id="tileCount">0</b><span>квадратных пикселей</span></div><div><b id="markerCount">4</b><span>маркера</span></div><div><b id="commandCount">0</b><span>команд</span></div></div>
+<div class="status" id="status">Ожидаю изображение.</div>
+<div class="note"><b>Как смешиваются цвета:</b> каждая клетка — отдельный квадрат и только один маркер. Промежуточные оттенки создаются частотой цветов: например, для зелёного программа ставит жёлтые и синие квадраты шахматным узором. Для более жёлтого зелёного увеличивается доля жёлтых клеток, для более синего — синих. Маркеры не накладываются друг на друга.</div>
+</main><aside class="panel">
+<h3 style="margin:0 0 8px">Параметры рисунка</h3>
+<label>Ширина рисунка, мм</label><input id="width" type="number" min="5" max="500" value="100">
+<label>Высота, мм (0 — сохранить пропорции)</label><input id="height" type="number" min="0" max="500" value="0">
+<div class="row"><div><label>Размер пикселя, мм</label><input id="step" type="number" min="0.5" max="5" step="0.1" value="1"></div><div><label>Порог белого</label><input id="white" type="number" min="0" max="100" value="8"></div></div>
+<label class="section">Установленные маркеры</label><div class="checks">
+<label class="check"><input type="checkbox" id="RED" checked><i class="dot" style="background:#dc2935"></i>Красный</label>
+<label class="check"><input type="checkbox" id="YELLOW" checked><i class="dot" style="background:#f4d21f"></i>Жёлтый</label>
+<label class="check"><input type="checkbox" id="BLUE" checked><i class="dot" style="background:#2859d8"></i>Синий</label>
+<label class="check"><input type="checkbox" id="BLACK" checked><i class="dot" style="background:#181818"></i>Чёрный</label>
+</div>
+<div class="toggle"><input type="checkbox" id="serpentine" checked><label for="serpentine">Движение змейкой</label></div>
+<label>Контраст смешивания</label><input id="dither" type="number" min="0" max="1" step="0.05" value="0.85">
+<div class="hint">Влияет на распределение пикселей между соседними цветами. Размер пикселя определяет плотность мозаики.</div>
+<div class="buttons"><button id="rebuild" class="secondary" style="width:100%">Пересчитать изображение</button></div>
+<div class="warn"><b>Важно про файл.</b> .TRK содержит команды CELL: координаты квадратной ячейки, её размер и цвет маркера. Это новый формат генератора, а не подтверждённая прошивка TrackDuino. Перед запуском на плате понадобится парсер CELL и согласование управления головками.</div>
+</aside></div><div class="footer">Всё преобразование выполняется локально в браузере. Фотография никуда не загружается.</div></div>
+<script>
+const $=id=>document.getElementById(id);let source=null,result=null;
+const inks=[
+ {id:'RED',name:'RED',rgb:[220,41,53],hex:'#dc2935'},
+ {id:'YELLOW',name:'YELLOW',rgb:[244,210,31],hex:'#f4d21f'},
+ {id:'BLUE',name:'BLUE',rgb:[40,89,216],hex:'#2859d8'},
+ {id:'BLACK',name:'BLACK',rgb:[24,24,24],hex:'#181818'}
+];
+// Центральные визуальные оттенки парных сочетаний. Это модель для подбора
+// частоты точек, а не обещание точного цвета конкретных фломастеров.
+const pairMix={
+ 'RED-YELLOW':[239,126,38],
+ 'YELLOW-BLUE':[62,148,70],
+ 'RED-BLUE':[133,73,151]
+};
+const bayer=[
+ [0,8,1,9],
+ [8,0,9,1],
+ [2,10,3,11],
+ [10,2,11,3]
+];
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{source=im;build()};im.onerror=()=>{$('status').textContent='Не удалось открыть изображение.'};im.src=URL.createObjectURL(f)};
+$('rebuild').onclick=build;
+['width','height','step','white','dither','RED','YELLOW','BLUE','BLACK','serpentine'].forEach(id=>$(id).addEventListener('change',build));
+function clamp(v){return Math.max(0,Math.min(255,v))}
+function dist(a,b){return (a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2}
+function lerp(a,b,t){return a.map((v,i)=>v+(b[i]-v)*t)}
+function makeRecipes(enabled){
+ const recipes=[{kind:'single',ids:[],rgb:[255,255,255],label:'WHITE'}];
+ for(const ink of enabled)recipes.push({kind:'single',ids:[ink.id],rgb:ink.rgb,label:ink.name});
+ const pairs=[['RED','YELLOW'],['YELLOW','BLUE'],['RED','BLUE']];
+ for(const [a,b] of pairs){
+  if(!enabled.some(x=>x.id===a)||!enabled.some(x=>x.id===b))continue;
+  const ia=inks.find(x=>x.id===a),ib=inks.find(x=>x.id===b),mid=pairMix[`${a}-${b}`];
+  for(let n=1;n<=9;n++){
+   const ratio=n/10;
+   const rgb=ratio<=.5?lerp(ia.rgb,mid,ratio*2):lerp(mid,ib.rgb,(ratio-.5)*2);
+   recipes.push({kind:'pair',a,b,ratio,rgb,label:`${a}+${b} ${Math.round(ratio*100)}% ${b}`});
+  }
+ }
+ return recipes;
+}
+function pickInk(recipe,x,y){
+ if(recipe.kind==='single')return recipe.ids[0]||null;
+ // При 50/50 чётные клетки — первый цвет, нечётные — второй:
+ // получается настоящий шахматный узор. При других долях матрица
+ // постепенно добавляет пиксели второго цвета, меняя частоту смеси.
+ const threshold=recipe.ratio*16;
+ const value=bayer[y%4][x%4];
+ return value<threshold?recipe.b:recipe.a;
+}
+function build(){
+ if(!source)return;
+ try{
+  const W=+$('width').value,H0=+$('height').value,S=+$('step').value,T=+$('white').value,D=+$('dither').value;
+  if(W<5||W>500||H0<0||H0>500||S<.5||S>5||T<0||T>100||D<0||D>1)throw Error('Проверь размеры, шаг и параметры.');
+  const enabled=inks.filter(p=>$(p.id).checked);if(!enabled.length)throw Error('Выбери хотя бы один маркер.');
+  const H=H0||W*source.height/source.width;
+  const cols=Math.max(2,Math.min(600,Math.round(W/S))),rows=Math.max(2,Math.min(600,Math.round(H/S)));
+  const cv=document.createElement('canvas');cv.width=cols;cv.height=rows;
+  const cx=cv.getContext('2d',{willReadFrequently:true});cx.fillStyle='#fff';cx.fillRect(0,0,cols,rows);cx.drawImage(source,0,0,cols,rows);
+  const pix=cx.getImageData(0,0,cols,rows).data,work=new Array(rows*cols);
+  for(let i=0;i<rows*cols;i++)work[i]=[pix[i*4],pix[i*4+1],pix[i*4+2]];
+  const recipes=makeRecipes(enabled),chosen=new Array(rows*cols);
+  function spread(x,y,e,f){if(x<0||x>=cols||y<0||y>=rows)return;const q=work[y*cols+x];for(let k=0;k<3;k++)q[k]=clamp(q[k]+e[k]*f)}
+  // Floyd–Steinberg выбирает оттенок-рецепт; затем рецепт физически
+  // раскладывается на отдельные клетки одного из двух маркеров.
+  for(let y=0;y<rows;y++){
+   const rev=$('serpentine').checked&&y%2===1;
+   for(let n=0;n<cols;n++){
+    const x=rev?cols-1-n:n,idx=y*cols+x,target=work[idx];
+    if(255-(target[0]+target[1]+target[2])/3<=T*2.55){chosen[idx]=recipes[0];continue;}
+    let best=recipes[1]||recipes[0],bestErr=dist(target,best.rgb);
+    for(let j=1;j<recipes.length;j++){const er=dist(target,recipes[j].rgb);if(er<bestErr){bestErr=er;best=recipes[j]}}
+    chosen[idx]=best;
+    const e=target.map((v,k)=>(v-best.rgb[k])*D),dir=rev?-1:1;
+    spread(x+dir,y,e,7/16);spread(x-dir,y+1,e,3/16);spread(x,y+1,e,5/16);spread(x+dir,y+1,e,1/16);
+   }
+  }
+  const sx=W/cols,sy=H/rows,cells=[];
+  // Каждая позиция сетки превращается в отдельный квадратный CELL.
+  // Здесь НЕТ группировки одинаковых цветов в горизонтальные линии.
+  for(let y=0;y<rows;y++){
+   const rev=$('serpentine').checked&&y%2===1;
+   for(let n=0;n<cols;n++){
+    const x=rev?cols-1-n:n,recipe=chosen[y*cols+x];
+    if(!recipe||recipe.kind==='single'&&recipe.ids.length===0)continue;
+    const color=pickInk(recipe,x,y);if(!color)continue;
+    cells.push({color,x:x*sx,y:y*sy,w:sx,h:sy,recipe:recipe.label});
+   }
+  }
+  result={cells,W,H,cols,rows,step:S,enabled};
+  $('tileCount').textContent=cells.length.toLocaleString('ru-RU');$('commandCount').textContent=(cells.length+enabled.length+8).toLocaleString('ru-RU');$('markerCount').textContent=enabled.length;
+  $('export').disabled=false;$('exportCsv').disabled=false;
+  $('status').textContent=`Готово: сетка ${cols} × ${rows}; ${cells.length} отдельных квадратных ячеек. Шаг около ${S} мм. Цвета смешиваются частотой пикселей, 50/50 — шахматный узор.`;
+  draw();
+ }catch(e){$('status').textContent=e.message;$('export').disabled=true;$('exportCsv').disabled=true;result=null;}
+}
+function draw(){
+ if(!result)return;const {cells,W,H,cols,rows}=result,canvas=document.createElement('canvas'),scale=Math.min(900/W,680/H);
+ canvas.width=Math.max(1,Math.round(W*scale));canvas.height=Math.max(1,Math.round(H*scale));
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+ const map=Object.fromEntries(inks.map(i=>[i.id,i.hex]));
+ // Рисуем каждую ячейку отдельным прямоугольником; линии/ряды не объединяем.
+ for(const c of cells){ctx.fillStyle=map[c.color];const x=Math.round(c.x*scale),y=Math.round(c.y*scale),w=Math.ceil(c.w*scale),h=Math.ceil(c.h*scale);ctx.fillRect(x,y,w,h);}
+ $('preview').innerHTML='';$('preview').appendChild(canvas);
+}
+function makeTRK(){
+ const r=result,out=['TRACKPLOTTER 7','UNITS MM',`SIZE ${r.W.toFixed(3)} ${r.H.toFixed(3)}`,'LAYERS 1','LAYER B1','MODE PIXEL_MOSAIC_SINGLE_INK','HEADS 4','HEAD RED','HEAD YELLOW','HEAD BLUE','HEAD BLACK'];
+ let last=null;for(const c of r.cells){if(c.color!==last){out.push(`PEN ${c.color}`);last=c.color;}out.push(`CELL ${c.x.toFixed(3)} ${c.y.toFixed(3)} ${c.w.toFixed(3)} ${c.h.toFixed(3)} ${c.color}`);}
+ out.push('PEN UP','END LAYER','END');return out.join('\n')+'\n';
+}
+function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1200)}
+$('export').onclick=()=>{if(result)download('trackplotter_pixel_mosaic.trk',makeTRK(),'text/plain')};
+$('exportCsv').onclick=()=>{if(!result)return;const rows=['marker,x_mm,y_mm,width_mm,height_mm',...result.cells.map(c=>[c.color,c.x.toFixed(3),c.y.toFixed(3),c.w.toFixed(3),c.h.toFixed(3)].join(','))];download('trackplotter_pixel_mosaic.csv',rows.join('\n')+'\n','text/csv')};
+</script></body></html>
